@@ -1,0 +1,122 @@
+{
+  "squareFootageAdjustments": [
+    {
+      "priceRange": "$1\u2013$250K",
+      "aboveGrade": 35,
+      "basement": 10,
+      "basementFinished": 15
+    },
+    {
+      "priceRange": "$250\u2013$450K",
+      "aboveGrade": [
+        45,
+        55
+      ],
+      "basement": 12,
+      "basementFinished": [
+        20,
+        25
+      ]
+    },
+    {
+      "priceRange": "$450\u2013$700K",
+      "aboveGrade": [
+        55,
+        65
+      ],
+      "basement": 15,
+      "basementFinished": [
+        25,
+        30
+      ]
+    },
+    {
+      "priceRange": "$700K\u2013$1.2M",
+      "aboveGrade": [
+        70,
+        85
+      ],
+      "basement": [
+        18,
+        22
+      ],
+      "basementFinished": [
+        30,
+        40
+      ]
+    },
+    {
+      "priceRange": "$1.2M+",
+      "aboveGrade": [
+        90,
+        120
+      ],
+      "basement": [
+        20,
+        30
+      ],
+      "basementFinished": [
+        35,
+        55
+      ]
+    }
+  ],
+  "garageAdjustment": {
+    "perBayRange": [
+      15000,
+      25000
+    ],
+    "tandemMultiplier": 0.6
+  },
+  "bathroomsAdjustment": {
+    "halfBathroom": [
+      4000,
+      5000
+    ],
+    "fullBathroom": [
+      8000,
+      10000
+    ]
+  },
+  "viewAdjustment": {
+    "greenbeltPercent": 3,
+    "mountainGolfPanoramicPercentRange": [
+      5,
+      15
+    ]
+  },
+  "walkoutBasementAdjustment": {
+    "range": [
+      15000,
+      25000
+    ]
+  },
+  "gardenLevelAdjustment": {
+    "range": [
+      10000,
+      15000
+    ]
+  },
+  "ageAdjustment": {
+    "perYear": 500
+  },
+  "recaptureRate": {
+    "defaultPercent": 85,
+    "rangePercent": [
+      75,
+      90
+    ]
+  },
+  "sellerConcessions": {
+    "note": "Always a negative adjustment equal to concessions amount."
+  },
+  "guidingPrinciples": [
+    "Adjust the comparable, not the subject.",
+    "Use price tier scaling for square footage adjustments.",
+    "Bathrooms and garages are fixed adjustments.",
+    "Views are percentage adjustments.",
+    "Recapture is partial, not full replacement cost.",
+    "Always deduct concessions.",
+    "Document any subjective adjustments."
+  ]
+}
