@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+private_logic/
+.secrets/
+.DS_Store
