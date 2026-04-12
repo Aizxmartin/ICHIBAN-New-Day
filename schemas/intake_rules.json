@@ -1,0 +1,23 @@
+{
+  "accepted_formats": {
+    "mls": [
+      "csv",
+      "xlsx"
+    ],
+    "subject": [
+      "pdf"
+    ],
+    "zillow": [
+      "pdf",
+      "jpg",
+      "jpeg",
+      "png"
+    ],
+    "redfin": [
+      "pdf",
+      "jpg",
+      "jpeg",
+      "png"
+    ]
+  }
+}
