@@ -16,7 +16,6 @@ To produce the strongest ICHIBAN report, upload as many of the following as avai
 ### Required
 - **MLS Market Data** (`.csv` or `.xlsx`)
 - **Subject Property Report** (`.pdf`)
-- **At least one AVM input** (Zillow, Redfin, or RealAVM)
 
 ### Recommended
 - **Zillow support file** (`.jpg`, `.jpeg`, `.png`, `.pdf`)
@@ -24,7 +23,10 @@ To produce the strongest ICHIBAN report, upload as many of the following as avai
 - **1004MC report** (`.pdf`)
 - **Agent / property notes** (`.txt`, `.docx`) or pasted text
 
-Additional support files improve market context, property interpretation, and final narrative quality.
+### Notes
+- **RealAVM and RealAVM Range** are expected to be extracted later from the uploaded **Subject Property PDF**
+- **Zillow** and **Redfin** may be entered manually and/or supported with screenshots or PDFs
+- Additional support files improve market context, property interpretation, and final narrative quality
 """
 )
 
@@ -32,7 +34,6 @@ st.divider()
 
 
 def load_market_data(uploaded_file) -> pd.DataFrame:
-    """Load MLS market data from CSV or XLSX."""
     suffix = Path(uploaded_file.name).suffix.lower()
     if suffix == ".csv":
         return pd.read_csv(uploaded_file)
@@ -42,7 +43,6 @@ def load_market_data(uploaded_file) -> pd.DataFrame:
 
 
 def parse_currency_input(value: str):
-    """Convert common currency-like input to float, or return None."""
     if not value:
         return None
     cleaned = (
@@ -62,7 +62,6 @@ def parse_currency_input(value: str):
 
 
 def read_notes_file(uploaded_file):
-    """Read supported notes file types."""
     suffix = Path(uploaded_file.name).suffix.lower()
 
     if suffix == ".txt":
@@ -86,21 +85,23 @@ def read_notes_file(uploaded_file):
 
 
 def set_intake_status():
-    """Evaluate whether the intake has the minimum required inputs."""
     mls_loaded = st.session_state.get("market_data_loaded", False)
     subject_loaded = st.session_state.get("subject_pdf_uploaded", False)
 
     zillow_value = st.session_state.get("zillow_value_num")
     redfin_value = st.session_state.get("redfin_value_num")
-    realavm_value = st.session_state.get("realavm_value_num")
 
-    avm_ready = any(v is not None for v in [zillow_value, redfin_value, realavm_value])
+    online_estimate_ready = any(v is not None for v in [zillow_value, redfin_value])
 
-    st.session_state["intake_ready"] = bool(mls_loaded and subject_loaded and avm_ready)
+    # Intake can proceed with required files even if Zillow/Redfin are blank,
+    # because RealAVM is expected from the subject PDF in the next module.
+    intake_ready = bool(mls_loaded and subject_loaded)
+
+    st.session_state["intake_ready"] = intake_ready
     st.session_state["intake_checklist"] = {
         "mls_loaded": mls_loaded,
         "subject_loaded": subject_loaded,
-        "avm_ready": avm_ready,
+        "online_estimate_ready": online_estimate_ready,
     }
 
 
@@ -125,7 +126,7 @@ with col2:
         "Upload Subject Property PDF",
         type=["pdf"],
         key="subject_pdf",
-        help="Example: Realist or subject property report PDF.",
+        help="Example: Realist or subject property report PDF. RealAVM and RealAVM Range are expected from this file.",
     )
 
 if mls_file is not None:
@@ -137,6 +138,8 @@ if mls_file is not None:
     except Exception as exc:
         st.session_state["market_data_loaded"] = False
         st.error(f"MLS market data could not be loaded: {exc}")
+else:
+    st.session_state["market_data_loaded"] = False
 
 if subject_pdf is not None:
     st.session_state["subject_pdf_uploaded"] = True
@@ -159,21 +162,23 @@ if st.session_state.get("subject_pdf_uploaded"):
 st.divider()
 
 st.header("B. Online Value Inputs")
-st.caption("Enter values manually and optionally upload support files.")
+st.caption("Enter Zillow and Redfin manually if available, and optionally upload support files.")
 
 left, right = st.columns(2)
 
 with left:
     st.markdown("#### Manual Value Entry")
 
-    zillow_value = st.text_input("Zillow Estimate", key="zillow_value")
+    zillow_value = st.text_input("Zillow Estimate (optional)", key="zillow_value")
     zillow_range = st.text_input("Zillow Range (optional)", key="zillow_range")
 
-    redfin_value = st.text_input("Redfin Estimate", key="redfin_value")
+    redfin_value = st.text_input("Redfin Estimate (optional)", key="redfin_value")
     redfin_range = st.text_input("Redfin Range (optional)", key="redfin_range")
 
-    realavm_value = st.text_input("RealAVM Estimate", key="realavm_value")
-    realavm_range = st.text_input("RealAVM Range (optional)", key="realavm_range")
+    st.info(
+        "RealAVM and RealAVM Range will be extracted from the Subject Property PDF in the next module. "
+        "A manual override can be added later if extraction is unavailable."
+    )
 
 with right:
     st.markdown("#### Optional Support Files")
@@ -199,11 +204,9 @@ with right:
 
 st.session_state["zillow_value_num"] = parse_currency_input(zillow_value)
 st.session_state["redfin_value_num"] = parse_currency_input(redfin_value)
-st.session_state["realavm_value_num"] = parse_currency_input(realavm_value)
 
 st.session_state["zillow_range_text"] = zillow_range
 st.session_state["redfin_range_text"] = redfin_range
-st.session_state["realavm_range_text"] = realavm_range
 
 st.session_state["zillow_file_uploaded"] = zillow_file is not None
 st.session_state["redfin_file_uploaded"] = redfin_file is not None
@@ -290,13 +293,16 @@ with status_col1:
     st.markdown("#### Checklist")
     st.write(f"{'✅' if checklist.get('mls_loaded') else '❌'} MLS Market Data uploaded")
     st.write(f"{'✅' if checklist.get('subject_loaded') else '❌'} Subject Property PDF uploaded")
-    st.write(f"{'✅' if checklist.get('avm_ready') else '❌'} At least one AVM value entered")
+    st.write(
+        f"{'✅' if checklist.get('online_estimate_ready') else '➖'} Zillow or Redfin entered (optional)"
+    )
     st.write(
         f"{'✅' if st.session_state.get('mc1004_file_uploaded') else '➖'} 1004MC support uploaded (optional)"
     )
     st.write(
         f"{'✅' if (st.session_state.get('notes_file_uploaded') or st.session_state.get('property_notes_text')) else '➖'} Property / agent notes added (optional)"
     )
+    st.write("✅ RealAVM expected from Subject Property PDF in next module")
 
 with status_col2:
     st.markdown("#### Status")
@@ -310,7 +316,10 @@ st.markdown(
 **Required to proceed:**
 - MLS Market Data
 - Subject Property PDF
-- At least one AVM value
+
+**Expected next:**
+- RealAVM and RealAVM Range will be extracted from the Subject Property PDF
+- Zillow and Redfin can be added now or later if available
 
 **Notes:**  
 You may add more support files and notes now, or refine them later before the final summary and pricing recommendation.
