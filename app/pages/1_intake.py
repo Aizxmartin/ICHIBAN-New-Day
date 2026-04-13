@@ -1,27 +1,324 @@
-import streamlit as st
+import io
+from pathlib import Path
+
 import pandas as pd
+import streamlit as st
 
-st.title("Module 1 - Intake")
+st.set_page_config(page_title="ICHIBAN - New Day | Intake", page_icon="🏡", layout="wide")
 
-mls_file = st.file_uploader("Upload MLS Data", type=["csv","xlsx"])
-subject_pdf = st.file_uploader("Upload Subject Property PDF", type=["pdf"])
-mc_pdf = st.file_uploader("Upload 1004MC Report", type=["pdf"])
+st.title("Module 1 — Intake")
+st.subheader("Guided drag-and-drop intake for a stronger ICHIBAN report")
 
-zillow_file = st.file_uploader("Upload Zillow", type=["pdf","jpg","jpeg","png"])
-redfin_file = st.file_uploader("Upload Redfin", type=["pdf","jpg","jpeg","png"])
+st.markdown(
+    """
+To produce the strongest ICHIBAN report, upload as many of the following as available.
 
-zillow_val = st.text_input("Zillow Estimate")
-redfin_val = st.text_input("Redfin Estimate")
-realavm_val = st.text_input("Real AVM Estimate")
+### Required
+- **MLS Market Data** (`.csv` or `.xlsx`)
+- **Subject Property Report** (`.pdf`)
+- **At least one AVM input** (Zillow, Redfin, or RealAVM)
 
-if mls_file:
-    if mls_file.name.endswith(".csv"):
-        df = pd.read_csv(mls_file)
+### Recommended
+- **Zillow support file** (`.jpg`, `.jpeg`, `.png`, `.pdf`)
+- **Redfin support file** (`.jpg`, `.jpeg`, `.png`, `.pdf`)
+- **1004MC report** (`.pdf`)
+- **Agent / property notes** (`.txt`, `.docx`) or pasted text
+
+Additional support files improve market context, property interpretation, and final narrative quality.
+"""
+)
+
+st.divider()
+
+
+def load_market_data(uploaded_file) -> pd.DataFrame:
+    """Load MLS market data from CSV or XLSX."""
+    suffix = Path(uploaded_file.name).suffix.lower()
+    if suffix == ".csv":
+        return pd.read_csv(uploaded_file)
+    if suffix == ".xlsx":
+        return pd.read_excel(uploaded_file)
+    raise ValueError("Unsupported market data file type. Please upload a CSV or XLSX file.")
+
+
+def parse_currency_input(value: str):
+    """Convert common currency-like input to float, or return None."""
+    if not value:
+        return None
+    cleaned = (
+        str(value)
+        .replace("$", "")
+        .replace(",", "")
+        .replace("–", "-")
+        .replace("—", "-")
+        .strip()
+    )
+    if cleaned == "":
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def read_notes_file(uploaded_file):
+    """Read supported notes file types."""
+    suffix = Path(uploaded_file.name).suffix.lower()
+
+    if suffix == ".txt":
+        return uploaded_file.read().decode("utf-8", errors="ignore"), None
+
+    if suffix == ".docx":
+        try:
+            from docx import Document
+        except Exception:
+            return "", "python-docx is not installed. DOCX notes could not be read."
+
+        try:
+            file_bytes = io.BytesIO(uploaded_file.read())
+            doc = Document(file_bytes)
+            text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            return text, None
+        except Exception as exc:
+            return "", f"DOCX notes could not be read: {exc}"
+
+    return "", "Unsupported notes file type. Please use .txt or .docx."
+
+
+def set_intake_status():
+    """Evaluate whether the intake has the minimum required inputs."""
+    mls_loaded = st.session_state.get("market_data_loaded", False)
+    subject_loaded = st.session_state.get("subject_pdf_uploaded", False)
+
+    zillow_value = st.session_state.get("zillow_value_num")
+    redfin_value = st.session_state.get("redfin_value_num")
+    realavm_value = st.session_state.get("realavm_value_num")
+
+    avm_ready = any(v is not None for v in [zillow_value, redfin_value, realavm_value])
+
+    st.session_state["intake_ready"] = bool(mls_loaded and subject_loaded and avm_ready)
+    st.session_state["intake_checklist"] = {
+        "mls_loaded": mls_loaded,
+        "subject_loaded": subject_loaded,
+        "avm_ready": avm_ready,
+    }
+
+
+st.header("A. Required Inputs")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("#### MLS Market Data")
+    st.caption("Drag and drop or browse for a `.csv` or `.xlsx` file.")
+    mls_file = st.file_uploader(
+        "Upload MLS Market Data",
+        type=["csv", "xlsx"],
+        key="mls_file",
+        help="Upload a 90-day, 6-month, or broader MLS export. Later modules will derive the current 90-day market set.",
+    )
+
+with col2:
+    st.markdown("#### Subject Property Report")
+    st.caption("Drag and drop or browse for a subject property `.pdf` file.")
+    subject_pdf = st.file_uploader(
+        "Upload Subject Property PDF",
+        type=["pdf"],
+        key="subject_pdf",
+        help="Example: Realist or subject property report PDF.",
+    )
+
+if mls_file is not None:
+    try:
+        market_df = load_market_data(mls_file)
+        st.session_state["market_data"] = market_df
+        st.session_state["market_data_loaded"] = True
+        st.session_state["market_data_filename"] = mls_file.name
+    except Exception as exc:
+        st.session_state["market_data_loaded"] = False
+        st.error(f"MLS market data could not be loaded: {exc}")
+
+if subject_pdf is not None:
+    st.session_state["subject_pdf_uploaded"] = True
+    st.session_state["subject_pdf_filename"] = subject_pdf.name
+else:
+    st.session_state["subject_pdf_uploaded"] = False
+
+if st.session_state.get("market_data_loaded") and "market_data" in st.session_state:
+    df = st.session_state["market_data"]
+    st.success(f"MLS file loaded: {st.session_state.get('market_data_filename')}")
+    preview_col1, preview_col2, preview_col3 = st.columns(3)
+    preview_col1.metric("Rows", len(df))
+    preview_col2.metric("Columns", len(df.columns))
+    preview_col3.metric("Preview Rows Shown", min(len(df), 10))
+    st.dataframe(df.head(10), use_container_width=True)
+
+if st.session_state.get("subject_pdf_uploaded"):
+    st.success(f"Subject PDF loaded: {st.session_state.get('subject_pdf_filename')}")
+
+st.divider()
+
+st.header("B. Online Value Inputs")
+st.caption("Enter values manually and optionally upload support files.")
+
+left, right = st.columns(2)
+
+with left:
+    st.markdown("#### Manual Value Entry")
+
+    zillow_value = st.text_input("Zillow Estimate", key="zillow_value")
+    zillow_range = st.text_input("Zillow Range (optional)", key="zillow_range")
+
+    redfin_value = st.text_input("Redfin Estimate", key="redfin_value")
+    redfin_range = st.text_input("Redfin Range (optional)", key="redfin_range")
+
+    realavm_value = st.text_input("RealAVM Estimate", key="realavm_value")
+    realavm_range = st.text_input("RealAVM Range (optional)", key="realavm_range")
+
+with right:
+    st.markdown("#### Optional Support Files")
+    st.caption("Drag and drop or browse for Zillow / Redfin screenshots or PDFs.")
+
+    zillow_file = st.file_uploader(
+        "Upload Zillow Support File",
+        type=["pdf", "jpg", "jpeg", "png"],
+        key="zillow_file",
+    )
+
+    redfin_file = st.file_uploader(
+        "Upload Redfin Support File",
+        type=["pdf", "jpg", "jpeg", "png"],
+        key="redfin_file",
+    )
+
+    mc1004_file = st.file_uploader(
+        "Upload 1004MC Report (Optional)",
+        type=["pdf"],
+        key="mc1004_file",
+    )
+
+st.session_state["zillow_value_num"] = parse_currency_input(zillow_value)
+st.session_state["redfin_value_num"] = parse_currency_input(redfin_value)
+st.session_state["realavm_value_num"] = parse_currency_input(realavm_value)
+
+st.session_state["zillow_range_text"] = zillow_range
+st.session_state["redfin_range_text"] = redfin_range
+st.session_state["realavm_range_text"] = realavm_range
+
+st.session_state["zillow_file_uploaded"] = zillow_file is not None
+st.session_state["redfin_file_uploaded"] = redfin_file is not None
+st.session_state["mc1004_file_uploaded"] = mc1004_file is not None
+
+if zillow_file is not None:
+    st.session_state["zillow_file_name"] = zillow_file.name
+if redfin_file is not None:
+    st.session_state["redfin_file_name"] = redfin_file.name
+if mc1004_file is not None:
+    st.session_state["mc1004_file_name"] = mc1004_file.name
+
+st.divider()
+
+st.header("C. Property Intelligence / Agent Notes")
+st.caption(
+    "Add anything known upfront about the property, seller, condition, layout, upgrades, defects, buyer feedback, or pricing strategy."
+)
+
+notes_col1, notes_col2 = st.columns(2)
+
+with notes_col1:
+    pasted_notes = st.text_area(
+        "Paste Notes",
+        height=220,
+        key="pasted_property_notes",
+        placeholder=(
+            "Example:\n"
+            "- New roof in 2023\n"
+            "- Older windows\n"
+            "- No sprinkler system\n"
+            "- Seller says kitchen has not been updated\n"
+            "- Strong school and location appeal\n"
+        ),
+    )
+
+with notes_col2:
+    notes_file = st.file_uploader(
+        "Upload Notes File (Optional)",
+        type=["txt", "docx"],
+        key="notes_file",
+        help="Accepted formats: .txt, .docx",
+    )
+
+notes_from_file = ""
+notes_file_error = None
+
+if notes_file is not None:
+    notes_from_file, notes_file_error = read_notes_file(notes_file)
+    if notes_file_error:
+        st.warning(notes_file_error)
+    elif notes_from_file.strip():
+        st.success(f"Notes file loaded: {notes_file.name}")
+        st.text_area(
+            "Preview Notes File Content",
+            value=notes_from_file,
+            height=220,
+            disabled=False,
+            key="notes_file_preview",
+        )
+
+combined_notes_parts = []
+if pasted_notes and pasted_notes.strip():
+    combined_notes_parts.append(pasted_notes.strip())
+if notes_from_file and notes_from_file.strip():
+    combined_notes_parts.append(notes_from_file.strip())
+
+combined_notes = "\n\n".join(combined_notes_parts).strip()
+
+st.session_state["property_notes_text"] = combined_notes
+st.session_state["notes_file_uploaded"] = notes_file is not None
+st.session_state["notes_file_name"] = notes_file.name if notes_file is not None else None
+
+st.divider()
+
+set_intake_status()
+
+st.header("D. Intake Readiness")
+
+checklist = st.session_state.get("intake_checklist", {})
+status_col1, status_col2 = st.columns([2, 1])
+
+with status_col1:
+    st.markdown("#### Checklist")
+    st.write(f"{'✅' if checklist.get('mls_loaded') else '❌'} MLS Market Data uploaded")
+    st.write(f"{'✅' if checklist.get('subject_loaded') else '❌'} Subject Property PDF uploaded")
+    st.write(f"{'✅' if checklist.get('avm_ready') else '❌'} At least one AVM value entered")
+    st.write(
+        f"{'✅' if st.session_state.get('mc1004_file_uploaded') else '➖'} 1004MC support uploaded (optional)"
+    )
+    st.write(
+        f"{'✅' if (st.session_state.get('notes_file_uploaded') or st.session_state.get('property_notes_text')) else '➖'} Property / agent notes added (optional)"
+    )
+
+with status_col2:
+    st.markdown("#### Status")
+    if st.session_state.get("intake_ready"):
+        st.success("Ready for next module")
     else:
-        df = pd.read_excel(mls_file)
+        st.warning("More required inputs needed")
 
-    st.dataframe(df.head())
-    st.session_state["market_data"] = df
+st.markdown(
+    """
+**Required to proceed:**
+- MLS Market Data
+- Subject Property PDF
+- At least one AVM value
 
-if st.button("Confirm Intake"):
-    st.session_state["intake_ready"] = True
+**Notes:**  
+You may add more support files and notes now, or refine them later before the final summary and pricing recommendation.
+"""
+)
+
+if st.button("Confirm Intake", type="primary"):
+    if st.session_state.get("intake_ready"):
+        st.success("Intake confirmed. Module 1 is complete.")
+    else:
+        st.error("Please complete the required inputs before confirming intake.")
