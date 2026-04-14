@@ -1,8 +1,0 @@
-
-streamlit
-pandas
-numpy
-openpyxl
-python-docx
-PyPDF2
-Pillow
