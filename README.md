@@ -1,99 +1,71 @@
+from typing import Any, Dict, List, Optional
 
-# ICHIBAN – New Day
 
-AI + Realtor Experience + Market Data + AI + Realtor Experience
+def _coerce_range(text_value: Optional[str]):
+    if not text_value:
+        return None, None
 
----
+    cleaned = (
+        str(text_value)
+        .replace('$', '')
+        .replace(',', '')
+        .replace('–', '-')
+        .replace('—', '-')
+        .replace('to', '-')
+        .strip()
+    )
 
-# Overview
+    parts = [p.strip() for p in cleaned.split('-') if p.strip()]
+    if len(parts) >= 2:
+        try:
+            return float(parts[0]), float(parts[1])
+        except ValueError:
+            return None, None
+    return None, None
 
-ICHIBAN – New Day is an AI-assisted real estate valuation platform designed to combine:
 
-• MLS Market Data  
-• Realtor Market Experience  
-• Structured Adjustment Logic  
-• AI-Driven Analysis  
+def _average(values: List[Optional[float]]):
+    usable = [float(v) for v in values if v is not None]
+    if not usable:
+        return None
+    return round(sum(usable) / len(usable), 2)
 
-The goal is to create more objective, transparent, and professional valuation reports.
 
----
+def build_subject_profile(parsed_subject: Dict[str, Any], session_state) -> Dict[str, Any]:
+    zillow_value = session_state.get('zillow_value_num')
+    redfin_value = session_state.get('redfin_value_num')
 
-# Architecture
+    zillow_low, zillow_high = _coerce_range(session_state.get('zillow_range_text'))
+    redfin_low, redfin_high = _coerce_range(session_state.get('redfin_range_text'))
 
-ICHIBAN is built using a 3-Layer Architecture:
+    online_average = _average([
+        parsed_subject.get('realavm'),
+        zillow_value,
+        redfin_value,
+    ])
 
-## 1. User Input Layer
+    warnings = list(parsed_subject.get('warnings', []))
+    if online_average is None:
+        warnings.append('No online estimate average could be calculated yet.')
 
-User uploads:
-
-• MLS Data (.CSV or .XLSX)  
-• Subject Property PDF  
-• Zillow Estimate (Manual or Image)  
-• Redfin Estimate (Manual or Image)  
-• 1004MC Report (Optional)
-
----
-
-## 2. Private Logic Layer (Hidden)
-
-This layer includes:
-
-• Proprietary Schema  
-• Comp Selection Logic  
-• Adjustment Engine  
-• Market Metrics Engine  
-• Narrative Agent  
-
-This logic remains private and is not exposed to users.
-
----
-
-## 3. Output Layer
-
-ICHIBAN Produces:
-
-• CMA Summary  
-• Market Absorption Analysis  
-• Comp Adjustment Table  
-• Valuation Range  
-• Final Recommendation  
-
----
-
-# Project Structure
-
-ICHIBAN-New-Day
-
-├── app  
-├── core  
-├── schemas  
-├── templates  
-├── docs  
-└── README.md  
-
----
-
-# Getting Started
-
-Install dependencies:
-
-pip install -r requirements.txt
-
-Run locally:
-
-streamlit run app/main.py
-
----
-
-# Status
-
-ICHIBAN – New Day is currently under active development.
-
-This repository represents a full rebuild of the original ICHIBAN platform.
-
----
-
-# Maintained By
-
-Benny Martinez  
-ICHIBAN Development Project
+    return {
+        'address': parsed_subject.get('address'),
+        'realavm': parsed_subject.get('realavm'),
+        'realavm_low': parsed_subject.get('realavm_low'),
+        'realavm_high': parsed_subject.get('realavm_high'),
+        'zillow': zillow_value,
+        'zillow_low': zillow_low,
+        'zillow_high': zillow_high,
+        'redfin': redfin_value,
+        'redfin_low': redfin_low,
+        'redfin_high': redfin_high,
+        'online_estimate_average': online_average,
+        'beds': parsed_subject.get('beds'),
+        'baths': parsed_subject.get('baths'),
+        'above_grade_sf': parsed_subject.get('above_grade_sf'),
+        'basement_sf': parsed_subject.get('basement_sf'),
+        'year_built': parsed_subject.get('year_built'),
+        'lot_size': parsed_subject.get('lot_size'),
+        'property_type': parsed_subject.get('property_type'),
+        'warnings': warnings,
+    }

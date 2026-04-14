@@ -1,0 +1,7 @@
+def validate_intake(session):
+    return bool(
+        session.get("market_data_loaded")
+        and session.get("subject_pdf_uploaded")
+        and session.get("subject_pdf_bytes")
+        and session.get("intake_ready")
+    )
