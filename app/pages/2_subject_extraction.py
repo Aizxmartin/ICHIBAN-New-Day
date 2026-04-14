@@ -1,7 +1,14 @@
+import sys
+from pathlib import Path
 import time
 
 import pandas as pd
 import streamlit as st
+
+# Make repo root importable when app entrypoint is app/main.py
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from core.subject_extractor import build_subject_profile
 
@@ -98,7 +105,7 @@ with left:
         ["Lot Size SF", fmt_number(subject_profile.get("lot_size_sqft"))],
     ]
     df = pd.DataFrame(profile_rows, columns=["Field", "Extracted Value"])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
 with right:
     st.markdown("### Extraction Status")
