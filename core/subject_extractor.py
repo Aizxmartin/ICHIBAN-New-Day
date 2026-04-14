@@ -18,12 +18,8 @@ def _clean_text(text: str) -> str:
 
 
 def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
-    if not pdf_bytes:
+    if not pdf_bytes or PdfReader is None:
         return ""
-
-    if PdfReader is None:
-        return ""
-
     try:
         reader = PdfReader(io.BytesIO(pdf_bytes))
         pages = []
@@ -101,7 +97,6 @@ def _extract_address(text: str) -> Optional[str]:
         r"Subject Address[^\n\r:]*[:\s]+(.+)",
         r"Address[^\n\r:]*[:\s]+(.+)",
     ]
-
     for pattern in address_patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
@@ -118,74 +113,25 @@ def build_subject_profile(pdf_bytes: bytes) -> Dict[str, Any]:
 
     real_avm, real_avm_raw = _extract_currency_after_label(
         text,
-        labels=[
-            r"Real\s*AVM",
-            r"RealAVM",
-            r"Estimated\s+Value",
-            r"Estimated\s+Subject\s+Value",
-        ],
+        labels=[r"Real\s*AVM", r"RealAVM", r"Estimated\s+Value", r"Estimated\s+Subject\s+Value"],
     )
 
     real_avm_low, real_avm_high, real_avm_range_raw = _extract_range(
         text,
-        labels=[
-            r"Real\s*AVM\s*Range",
-            r"RealAVM\s*Range",
-            r"Value\s*Range",
-            r"Estimated\s+Value\s*Range",
-        ],
+        labels=[r"Real\s*AVM\s*Range", r"RealAVM\s*Range", r"Value\s*Range", r"Estimated\s+Value\s*Range"],
     )
 
     above_grade_sqft = _extract_int_after_label(
         text,
-        labels=[
-            r"Above\s+Grade\s+Finished\s+Area",
-            r"Above\s+Grade\s+SF",
-            r"Living\s+Area",
-            r"GLA",
-            r"Finished\s+Area",
-        ],
+        labels=[r"Above\s+Grade\s+Finished\s+Area", r"Above\s+Grade\s+SF", r"Living\s+Area", r"GLA", r"Finished\s+Area"],
     )
-
-    beds = _extract_float_after_label(
-        text,
-        labels=[
-            r"Bedrooms",
-            r"Beds",
-            r"Bedrooms\s+Total",
-        ],
-    )
-
-    baths = _extract_float_after_label(
-        text,
-        labels=[
-            r"Bathrooms",
-            r"Baths",
-            r"Bathrooms\s+Total",
-            r"Baths\s+Total",
-        ],
-    )
-
-    year_built = _extract_int_after_label(
-        text,
-        labels=[
-            r"Year\s+Built",
-            r"Built\s+in",
-        ],
-    )
-
-    lot_size_sqft = _extract_int_after_label(
-        text,
-        labels=[
-            r"Lot\s+Size",
-            r"Lot\s+Sq\.?\s*Ft\.?",
-            r"Site\s+Area",
-        ],
-    )
-
+    beds = _extract_float_after_label(text, labels=[r"Bedrooms", r"Beds", r"Bedrooms\s+Total"])
+    baths = _extract_float_after_label(text, labels=[r"Bathrooms", r"Baths", r"Bathrooms\s+Total", r"Baths\s+Total"])
+    year_built = _extract_int_after_label(text, labels=[r"Year\s+Built", r"Built\s+in"])
+    lot_size_sqft = _extract_int_after_label(text, labels=[r"Lot\s+Size", r"Lot\s+Sq\.?\s*Ft\.?", r"Site\s+Area"])
     address = _extract_address(text)
 
-    subject = {
+    return {
         "source": "subject_property_pdf",
         "subject_address": address,
         "real_avm": real_avm,
@@ -201,5 +147,3 @@ def build_subject_profile(pdf_bytes: bytes) -> Dict[str, Any]:
         "extracted_text_available": bool(text),
         "extracted_text_preview": text[:2500] if text else "",
     }
-
-    return subject
