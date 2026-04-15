@@ -371,3 +371,16 @@ def build_subject_profile(pdf_bytes: bytes) -> Dict[str, Any]:
             "extracted_text_preview": full_text[:8000] if full_text else "",
         },
     }
+
+
+def extract_subject_property(pdf_bytes: bytes, filename: str | None = None) -> Dict[str, Any]:
+    """Compatibility wrapper for Module 2 page import."""
+    result = build_subject_profile(pdf_bytes)
+    if filename:
+        result.setdefault("document_meta", {})
+        result["document_meta"]["filename"] = filename
+    # Keep top-level preview key expected by newer page
+    debug = result.get("debug", {}) or {}
+    if "raw_text_preview" not in result:
+        result["raw_text_preview"] = debug.get("extracted_text_preview", "")
+    return result

@@ -15,8 +15,21 @@ extract_subject_property = None
 
 try:
     from core.subject_extractor import extract_subject_property
-except Exception as e:
-    IMPORT_ERROR = str(e)
+except Exception:
+    try:
+        from core.subject_extractor import build_subject_profile
+
+        def extract_subject_property(pdf_bytes: bytes, filename: str | None = None):
+            result = build_subject_profile(pdf_bytes)
+            if filename:
+                result.setdefault("document_meta", {})
+                result["document_meta"]["filename"] = filename
+            debug = result.get("debug", {}) or {}
+            if "raw_text_preview" not in result:
+                result["raw_text_preview"] = debug.get("extracted_text_preview", "")
+            return result
+    except Exception as e:
+        IMPORT_ERROR = str(e)
 
 st.set_page_config(page_title="Module 2 - Subject Extraction", layout="wide")
 
