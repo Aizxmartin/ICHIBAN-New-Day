@@ -41,9 +41,27 @@ st.write(
     "and generate issue notes that will later feed Data Verification Notes."
 )
 
+default_uploaded = None
 uploaded = st.file_uploader("Upload subject property PDF", type=["pdf"])
 
+if uploaded is None and st.session_state.get("subject_pdf_bytes"):
+    st.info(f"Using subject PDF from Intake: {st.session_state.get('subject_pdf_filename', 'uploaded PDF')}")
+    class _StateUpload:
+        def __init__(self, name: str, data: bytes):
+            self.name = name
+            self._data = data
+        def read(self):
+            return self._data
+    uploaded = _StateUpload(
+        st.session_state.get("subject_pdf_filename", "subject_property.pdf"),
+        st.session_state["subject_pdf_bytes"],
+    )
+
 def render_results(result: Dict[str, Any]) -> None:
+    st.session_state["subject_extraction_result"] = result
+    st.session_state["subject_property"] = result.get("subject_property", {}) or {}
+    st.session_state["subject_data_issues"] = result.get("data_issues", []) or []
+
     subject = result.get("subject_property", {}) or {}
     data_issues = result.get("data_issues", []) or []
     field_sources = result.get("field_sources", {}) or {}
@@ -81,6 +99,10 @@ def render_results(result: Dict[str, Any]) -> None:
             st.text(raw_text[:12000])
         else:
             st.info("No text preview available.")
+
+    st.divider()
+    if st.button("Proceed to Module 3", type="primary"):
+        st.switch_page("pages/3_readiness_check.py")
 
 if IMPORT_ERROR:
     st.error("Could not import the subject extractor.")

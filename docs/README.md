@@ -34,8 +34,8 @@ Current Module 2 goals:
 - Missing-data issue tracking instead of visible confidence scoring
 - Clean handoff to later modules and report language
 
-### Module 3 — Online Estimate Layer
-Combine available AVM, Zillow, and Redfin inputs into an online estimate framework.
+### Module 3 — Readiness / Decision Engine
+Evaluate whether extracted subject data and market inputs are strong enough for a full report, a limited-scope valuation, or an insufficient-data stop.
 
 ### Module 4 — Comp Filtering
 Apply objective comp filters and comp selection rules.
