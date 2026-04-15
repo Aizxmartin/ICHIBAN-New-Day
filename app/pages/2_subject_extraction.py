@@ -1,5 +1,3 @@
-import io
-import json
 import os
 import sys
 from typing import Any, Dict
@@ -12,13 +10,13 @@ REPO_ROOT = os.path.abspath(os.path.join(APP_DIR, ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
+IMPORT_ERROR = None
+extract_subject_property = None
+
 try:
     from core.subject_extractor import extract_subject_property
 except Exception as e:
-    extract_subject_property = None
     IMPORT_ERROR = str(e)
-else:
-    IMPORT_ERROR = None
 
 st.set_page_config(page_title="Module 2 - Subject Extraction", layout="wide")
 
@@ -85,7 +83,6 @@ else:
             try:
                 result = extract_subject_property(pdf_bytes, filename=uploaded.name)
             except TypeError:
-                # Fallback in case the function only accepts bytes
                 result = extract_subject_property(pdf_bytes)
             except Exception as e:
                 st.error("The extractor ran into an error.")

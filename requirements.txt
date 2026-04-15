@@ -1,1 +1,6 @@
-streamlit\npandas\nopenpyxl\npython-docx\nPyMuPDF\npdfplumber\n
+streamlit
+pandas
+openpyxl
+python-docx
+PyMuPDF
+pdfplumber
