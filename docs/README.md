@@ -1,4 +1,3 @@
-
 # ICHIBAN New Day Documentation
 
 ## Purpose
@@ -24,24 +23,39 @@ Private logic remains separate from public UI.
 ## Modules
 
 ### Module 1 — Intake
-Upload data and validate inputs
+Upload files and validate required inputs.
 
-### Module 2 — Market Analysis
-90-day filtering and market metrics
+### Module 2 — Subject Property Extraction Engine
+Parse uploaded subject property PDFs, normalize core property facts, and log missing-data issues.
 
-### Module 3 — Comp Selection
-Smart filtering and weighting
+Current Module 2 goals:
+- Flexible PDF parsing across REcolorado, CoreLogic, and county-style reports
+- Canonical subject property JSON output
+- Missing-data issue tracking instead of visible confidence scoring
+- Clean handoff to later modules and report language
 
-### Module 4 — Valuation Engine
-Adjustment and value calculation
+### Module 3 — Online Estimate Layer
+Combine available AVM, Zillow, and Redfin inputs into an online estimate framework.
 
-### Module 5 — Final Report
-Narrative and export
+### Module 4 — Comp Filtering
+Apply objective comp filters and comp selection rules.
 
----
+### Module 5 — Adjustment Engine
+Run concrete property adjustments using the approved schema.
+
+### Module 6+ — Report and GPT Interpretation Layers
+Build the final report, including Data Verification Notes and GPT Market Interpretation.
+
+## Current Report Philosophy
+
+- Objective adjustments first
+- GPT interpretation after concrete math
+- No visible confidence scoring
+- Missing data explained in plain language
 
 ## Future Enhancements
 
+- Subdivision / amenity enrichment
+- Deeper remarks mining after structured adjustments
 - API-based AVM retrieval
 - Automated 1004MC parsing
-- Machine learning comp weighting
