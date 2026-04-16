@@ -2,9 +2,30 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
+
+
+PREFERRED_HEADER_KEYWORDS = [
+    "close price",
+    "above grade",
+    "address",
+    "street",
+    "listing id",
+    "status",
+    "bed",
+    "bath",
+    "concess",
+    "sold date",
+    "closed date",
+]
+
+REQUIRED_COMP_COLUMN_GROUPS = {
+    "price": ["close price", "sold price", "closed price"],
+    "sqft": ["above grade", "above-grade", "building area", "finished area"],
+    "address": ["address", "street name", "property address"],
+}
 
 
 def _clean_number(value: Any) -> Optional[float]:
@@ -19,21 +40,63 @@ def _clean_number(value: Any) -> Optional[float]:
         return None
 
 
-def load_market_data_from_bytes(file_bytes: bytes, filename: str) -> pd.DataFrame:
+def _read_raw_market_data(file_bytes: bytes, filename: str, header: Optional[int]) -> pd.DataFrame:
     suffix = Path(filename).suffix.lower()
     file_obj = io.BytesIO(file_bytes)
     if suffix == ".csv":
-        return pd.read_csv(file_obj)
+        return pd.read_csv(file_obj, header=header)
     if suffix == ".xlsx":
-        return pd.read_excel(file_obj)
+        return pd.read_excel(file_obj, header=header)
     raise ValueError("Unsupported market data file type. Please upload a CSV or XLSX file.")
+
+
+def _score_header_labels(labels: List[str]) -> int:
+    score = 0
+    lowered = [str(x).strip().lower() for x in labels]
+    for label in lowered:
+        if not label:
+            continue
+        if not label.startswith("unnamed"):
+            score += 1
+        for keyword in PREFERRED_HEADER_KEYWORDS:
+            if keyword in label:
+                score += 3
+    return score
+
+
+def load_market_data_from_bytes(file_bytes: bytes, filename: str) -> pd.DataFrame:
+    candidates = []
+    for header in [0, 1, 2, 3]:
+        try:
+            df = _read_raw_market_data(file_bytes, filename, header=header)
+        except Exception:
+            continue
+        labels = [str(c) for c in df.columns]
+        candidates.append((_score_header_labels(labels), header, df))
+
+    if not candidates:
+        raise ValueError("Market data file could not be read.")
+
+    candidates.sort(key=lambda x: (x[0], -len(x[2].columns)), reverse=True)
+    return candidates[0][2]
 
 
 def normalize_market_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     cleaned = df.copy()
     cleaned.columns = [str(c).strip() for c in cleaned.columns]
-    if "Unnamed: 0" in cleaned.columns:
-        cleaned = cleaned.drop(columns=["Unnamed: 0"])
+
+    unnamed_cols = [c for c in cleaned.columns if str(c).strip().lower().startswith("unnamed")]
+    if len(unnamed_cols) >= max(1, len(cleaned.columns) // 2) and len(cleaned) > 0:
+        first_row = [str(v).strip() for v in cleaned.iloc[0].tolist()]
+        if _score_header_labels(first_row) > _score_header_labels(list(cleaned.columns)):
+            cleaned.columns = first_row
+            cleaned = cleaned.iloc[1:].reset_index(drop=True)
+
+    cleaned.columns = [str(c).strip() for c in cleaned.columns]
+    drop_cols = [c for c in cleaned.columns if str(c).strip().lower() in {"unnamed: 0", ""}]
+    if drop_cols:
+        cleaned = cleaned.drop(columns=drop_cols, errors="ignore")
+
     return cleaned
 
 
@@ -75,6 +138,30 @@ def _market_data_ready(df: Optional[pd.DataFrame]) -> bool:
     return df is not None and not df.empty
 
 
+def _market_headers_usable(df: Optional[pd.DataFrame]) -> bool:
+    if df is None or df.empty:
+        return False
+    labels = [str(c).strip() for c in df.columns]
+    if not labels:
+        return False
+    unnamed_count = sum(1 for c in labels if c.lower().startswith("unnamed"))
+    if unnamed_count >= max(1, len(labels) // 2):
+        return False
+    return _score_header_labels(labels) > 3
+
+
+def _missing_required_comp_groups(df: Optional[pd.DataFrame]) -> List[str]:
+    if df is None or df.empty:
+        return list(REQUIRED_COMP_COLUMN_GROUPS.keys())
+    labels = [str(c).strip().lower() for c in df.columns]
+    missing = []
+    for group, options in REQUIRED_COMP_COLUMN_GROUPS.items():
+        found = any(any(opt in label for opt in options) for label in labels)
+        if not found:
+            missing.append(group)
+    return missing
+
+
 def evaluate_readiness(
     subject_property: Dict[str, Any],
     data_issues: List[str],
@@ -87,7 +174,10 @@ def evaluate_readiness(
     address_ready = _has_address(subject_property)
     sqft_ready = _has_usable_square_footage(subject_property)
     property_type_ready = _has_property_type(subject_property)
-    comps_ready = _market_data_ready(market_df)
+    comps_loaded = _market_data_ready(market_df)
+    headers_usable = _market_headers_usable(market_df)
+    missing_comp_groups = _missing_required_comp_groups(market_df)
+    comps_ready = comps_loaded and headers_usable and not missing_comp_groups
     online_ready = _has_online_support(online_inputs)
 
     limitations: List[str] = []
@@ -97,15 +187,21 @@ def evaluate_readiness(
         limitations.append("Usable subject square footage could not be confidently identified.")
     if not property_type_ready:
         limitations.append("Property type could not be clearly identified.")
-    if not comps_ready:
+    if not comps_loaded:
         limitations.append("MLS market data is missing or empty.")
+    if comps_loaded and not headers_usable:
+        limitations.append("MLS market data headers could not be normalized into usable field names.")
+    if missing_comp_groups:
+        limitations.append(
+            "MLS market data is missing required comp fields: " + ", ".join(missing_comp_groups) + "."
+        )
     if not online_ready:
         limitations.append("No AVM, Zillow, or Redfin support value is available.")
 
     if address_ready and sqft_ready and property_type_ready and comps_ready:
         status = "full_report_ready"
         next_step = "comp_filtering"
-    elif address_ready and comps_ready and online_ready:
+    elif address_ready and comps_loaded and online_ready:
         status = "limited_scope_only"
         next_step = "limited_scope_valuation"
     else:
@@ -116,6 +212,9 @@ def evaluate_readiness(
         "status": status,
         "subject_ready": address_ready and sqft_ready and property_type_ready,
         "comps_ready": comps_ready,
+        "comps_loaded": comps_loaded,
+        "market_headers_usable": headers_usable,
+        "missing_comp_field_groups": missing_comp_groups,
         "online_estimate_available": online_ready,
         "address_ready": address_ready,
         "square_footage_ready": sqft_ready,

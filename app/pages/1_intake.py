@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from core.readiness_engine import load_market_data_from_bytes, normalize_market_dataframe
+
 st.set_page_config(page_title="ICHIBAN - New Day | Intake", page_icon="🏡", layout="wide")
 
 st.title("Module 1 — Intake")
@@ -32,15 +34,6 @@ To produce the strongest ICHIBAN report, upload as many of the following as avai
 )
 
 st.divider()
-
-
-def load_market_data(uploaded_file) -> pd.DataFrame:
-    suffix = Path(uploaded_file.name).suffix.lower()
-    if suffix == ".csv":
-        return pd.read_csv(uploaded_file)
-    if suffix == ".xlsx":
-        return pd.read_excel(uploaded_file)
-    raise ValueError("Unsupported market data file type. Please upload a CSV or XLSX file.")
 
 
 def parse_currency_input(value: str):
@@ -132,7 +125,8 @@ with col2:
 
 if mls_file is not None:
     try:
-        market_df = load_market_data(mls_file)
+        market_df = load_market_data_from_bytes(mls_file.getvalue(), mls_file.name)
+        market_df = normalize_market_dataframe(market_df)
         st.session_state["market_data"] = market_df
         st.session_state["market_data_loaded"] = True
         st.session_state["market_data_filename"] = mls_file.name
@@ -157,7 +151,7 @@ if st.session_state.get("market_data_loaded") and "market_data" in st.session_st
     preview_col1.metric("Rows", len(df))
     preview_col2.metric("Columns", len(df.columns))
     preview_col3.metric("Preview Rows Shown", min(len(df), 10))
-    st.dataframe(df.head(10), use_container_width=True)
+    st.dataframe(df.head(10), width="stretch")
 
 if st.session_state.get("subject_pdf_uploaded"):
     st.success(f"Subject PDF loaded: {st.session_state.get('subject_pdf_filename')}")

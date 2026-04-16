@@ -59,3 +59,6 @@ Build the final report, including Data Verification Notes and GPT Market Interpr
 - Deeper remarks mining after structured adjustments
 - API-based AVM retrieval
 - Automated 1004MC parsing
+
+
+Note: Module 3 should only return full_report_ready when subject data is sufficient and MLS market inputs have been normalized into usable field names.

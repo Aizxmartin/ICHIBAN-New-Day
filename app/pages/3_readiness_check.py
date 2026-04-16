@@ -93,7 +93,7 @@ st.json(result)
 
 st.subheader("Interpretation")
 if status == "full_report_ready":
-    st.write("The system has enough verified subject and market data to move into comp filtering and the full report path.")
+    st.write("The system has enough verified subject and normalized market data to move into comp filtering and the full report path.")
 elif status == "limited_scope_only":
     st.write(
         "The system does not have enough verified subject data for a full report, "
